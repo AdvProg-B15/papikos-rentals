@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.papikos.rentals.model;
 
+import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,8 +17,7 @@ public class Rental {
     private String checkInDate;
     private int durationMonths;
 
-    @Setter
-    private String status;
+    private RentalStatus status;
 
     private static final List<String> VALID_STATUSES = Arrays.asList("PENDING", "CONFIRMED", "ONGOING", "COMPLETED", "CANCELLED");
     private static final String DEFAULT_STATUS = "PENDING";
@@ -52,26 +52,33 @@ public class Rental {
         this.phoneNumber = phoneNumber;
         this.checkInDate = checkInDate;
         this.durationMonths = durationMonths;
-        this.status = DEFAULT_STATUS;
+        this.status = RentalStatus.PENDING;
     }
 
-    public Rental(String id, KosDummy kos, TenantDummy tenant, String fullName, String phoneNumber, String checkInDate, int durationMonths, String status) {
-        this(id, kos, tenant, fullName, phoneNumber, checkInDate, durationMonths);
+    public Rental(String id, KosDummy kos, TenantDummy tenant, String fullName, String phoneNumber, String checkInDate, int durationMonths, String statusStr) {
+        this(id, kos, tenant, fullName, phoneNumber, checkInDate, durationMonths); // Panggil konstruktor pertama
 
-        if (!isValidStatus(status)) {
-            throw new IllegalArgumentException("Invalid status provided: " + status);
+        if (!RentalStatus.contains(statusStr)) {
+            throw new IllegalArgumentException("Invalid status provided: " + statusStr);
         }
-        this.status = status;
+        RentalStatus.fromString(statusStr).ifPresent(validStatus -> this.status = validStatus);
     }
 
     private boolean isValidStatus(String status) {
         return status != null && VALID_STATUSES.contains(status.toUpperCase());
     }
 
-    public void setStatus(String newStatus) {
-        if (isValidStatus(newStatus)) {
-            this.status = newStatus.toUpperCase();
-        }
+    public void setStatus(String newStatusStr) {
+        RentalStatus.fromString(newStatusStr)
+                .ifPresent(validStatus -> this.status = validStatus);
+    }
+
+    public RentalStatus getStatusEnum() {
+        return status;
+    }
+
+    public String getStatus() {
+        return status.name();
     }
 
 }
