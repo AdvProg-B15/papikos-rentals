@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.papikos.rentals.model;
 
+import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,7 +93,7 @@ class RentalTest {
     void testCreateRentalWithDefaultStatus_shouldSetStatusToPending() {
         Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration);
         assertNotNull(rental);
-        assertEquals("PENDING", rental.getStatus());
+        assertEquals(RentalStatus.PENDING, rental.getStatusEnum());
         assertEquals(validId, rental.getId());
         assertEquals(dummyKos, rental.getKos());
         assertEquals(dummyTenant, rental.getTenant());
@@ -104,10 +105,10 @@ class RentalTest {
 
     @Test
     void testCreateRentalWithExplicitValidStatus_shouldSetStatusCorrectly() {
-        String status = "CONFIRMED";
-        Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration, status);
+        String statusStr = RentalStatus.CONFIRMED.name();
+        Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration, statusStr);
         assertNotNull(rental);
-        assertEquals(status, rental.getStatus());
+        assertEquals(RentalStatus.CONFIRMED, rental.getStatusEnum());
     }
 
     @Test
@@ -121,30 +122,27 @@ class RentalTest {
     @Test
     void testSetStatusWithValidStatus_shouldUpdateStatus() {
         Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration);
-        assertEquals("PENDING", rental.getStatus()); // Status awal
+        assertEquals(RentalStatus.PENDING, rental.getStatusEnum());
 
-        String newValidStatus = "ONGOING";
-        rental.setStatus(newValidStatus);
-        assertEquals(newValidStatus, rental.getStatus());
+        rental.setStatus(RentalStatus.ONGOING.name());
+        assertEquals(RentalStatus.ONGOING, rental.getStatusEnum());
 
-        newValidStatus = "COMPLETED";
-        rental.setStatus(newValidStatus);
-        assertEquals(newValidStatus, rental.getStatus());
+        rental.setStatus(RentalStatus.COMPLETED.name());
+        assertEquals(RentalStatus.COMPLETED, rental.getStatusEnum());
 
-        newValidStatus = "CANCELLED";
-        rental.setStatus(newValidStatus);
-        assertEquals(newValidStatus, rental.getStatus());
+        rental.setStatus(RentalStatus.CANCELLED.name());
+        assertEquals(RentalStatus.CANCELLED, rental.getStatusEnum());
     }
 
     @Test
     void testSetStatusWithInvalidStatus_shouldNotUpdateStatus() {
-        Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration, "CONFIRMED");
-        String initialStatus = rental.getStatus();
-        assertEquals("CONFIRMED", initialStatus);
+        Rental rental = new Rental(validId, dummyKos, dummyTenant, validFullName, validPhoneNumber, validCheckInDate, validDuration, RentalStatus.CONFIRMED.name());
+        RentalStatus initialStatus = rental.getStatusEnum();
+        assertEquals(RentalStatus.CONFIRMED, initialStatus);
 
         String invalidStatus = "SELESAI";
         rental.setStatus(invalidStatus);
 
-        assertEquals(initialStatus, rental.getStatus());
+        assertEquals(initialStatus, rental.getStatusEnum());
     }
 }
