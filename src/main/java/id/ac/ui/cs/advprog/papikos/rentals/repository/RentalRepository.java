@@ -13,18 +13,28 @@ public class RentalRepository {
     private final Map<String, Rental> rentals = new HashMap<>();
 
     public Rental save(Rental rental) {
-        return null;
+        if (rental == null || rental.getId() == null || rental.getId().trim().isEmpty()) {
+            throw new IllegalArgumentException("Rental or Rental ID cannot be null or empty for saving.");
+        }
+        rentals.put(rental.getId(), rental);
+        return rental;
     }
 
     public Optional<Rental> findById(String id) {
-        return Optional.empty();
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(rentals.get(id));
     }
 
     public List<Rental> findAll() {
-        return new ArrayList<>();
+        return new ArrayList<>(rentals.values());
     }
 
     public boolean deleteById(String id) {
-        return false;
+        if (id == null) {
+            return false;
+        }
+        return rentals.remove(id) != null;
     }
 }
