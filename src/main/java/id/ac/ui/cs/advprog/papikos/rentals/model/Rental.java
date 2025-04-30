@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Getter
+@Setter
 public class Rental {
     private String id;
     private KosDummy kos;
