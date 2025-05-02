@@ -1,85 +1,89 @@
 package id.ac.ui.cs.advprog.papikos.rentals.model;
 
 import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
-import lombok.Getter;
-import lombok.Setter;
 
-import java.util.Arrays;
-import java.util.List;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "rentals")
 public class Rental {
-    private String id;
-    private KosDummy kos;
-    private TenantDummy tenant;
-    private String fullName;
-    private String phoneNumber;
-    private String checkInDate;
-    private int durationMonths;
 
-    private RentalStatus status;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "rental_id", updatable = false, nullable = false)
+    private UUID id;
 
-    private static final List<String> VALID_STATUSES = Arrays.asList("PENDING", "CONFIRMED", "ONGOING", "COMPLETED", "CANCELLED");
-    private static final String DEFAULT_STATUS = "PENDING";
+    @Column(name = "tenant_user_id", nullable = false)
+    private UUID tenantUserId; // Store only the ID
 
-    public Rental(String id, KosDummy kos, TenantDummy tenant, String fullName, String phoneNumber, String checkInDate, int durationMonths) {
-        if (id == null || id.trim().isEmpty()) {
-            throw new IllegalArgumentException("Rental ID cannot be null or empty.");
-        }
-        if (kos == null) {
-            throw new IllegalArgumentException("Kos cannot be null.");
-        }
-        if (tenant == null) {
-            throw new IllegalArgumentException("Tenant cannot be null.");
-        }
-        if (fullName == null || fullName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Full name cannot be null or empty.");
-        }
-        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
-            throw new IllegalArgumentException("Phone number cannot be null or empty.");
-        }
-        if (checkInDate == null || checkInDate.trim().isEmpty()) {
-            throw new IllegalArgumentException("Check-in date cannot be null or empty.");
-        }
-        if (durationMonths <= 0) {
-            throw new IllegalArgumentException("Duration must be greater than 0 months.");
-        }
+    @Column(name = "property_id", nullable = false)
+    private UUID propertyId; // Store only the ID
 
-        this.id = id;
-        this.kos = kos;
-        this.tenant = tenant;
-        this.fullName = fullName;
-        this.phoneNumber = phoneNumber;
-        this.checkInDate = checkInDate;
-        this.durationMonths = durationMonths;
-        this.status = RentalStatus.PENDING;
+    @Column(name = "owner_user_id", nullable = false)
+    private UUID ownerUserId; // Store only the ID (denormalized)
+
+    @Column(name = "submitted_tenant_name", nullable = false, length = 255)
+    private String submittedTenantName;
+
+    @Column(name = "submitted_tenant_phone", nullable = false, length = 20)
+    private String submittedTenantPhone;
+
+    @Column(name = "rental_start_date", nullable = false)
+    private LocalDate rentalStartDate;
+
+    @Column(name = "rental_duration_months", nullable = false)
+    private Integer rentalDurationMonths;
+
+    @Column(name = "rental_end_date", nullable = false)
+    private LocalDate rentalEndDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private RentalStatus status = RentalStatus.PENDING_APPROVAL; // Default status
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+
+    /**
+     * Calculates and sets the rental end date based on start date and duration.
+     * Should be called before saving/updating if start date or duration changes.
+     */
+    public void calculateAndSetEndDate() {
+        if (this.rentalStartDate != null && this.rentalDurationMonths != null && this.rentalDurationMonths > 0) {
+            this.rentalEndDate = this.rentalStartDate.plusMonths(this.rentalDurationMonths).minusDays(1); // Often end date is inclusive last day
+        } else {
+            this.rentalEndDate = null;
+        }
     }
 
-    public Rental(String id, KosDummy kos, TenantDummy tenant, String fullName, String phoneNumber, String checkInDate, int durationMonths, String statusStr) {
-        this(id, kos, tenant, fullName, phoneNumber, checkInDate, durationMonths); // Panggil konstruktor pertama
-
-        if (!RentalStatus.contains(statusStr)) {
-            throw new IllegalArgumentException("Invalid status provided: " + statusStr);
-        }
-        RentalStatus.fromString(statusStr).ifPresent(validStatus -> this.status = validStatus);
-    }
-
-    private boolean isValidStatus(String status) {
-        return status != null && VALID_STATUSES.contains(status.toUpperCase());
-    }
-
-    public void setStatus(String newStatusStr) {
-        RentalStatus.fromString(newStatusStr)
-                .ifPresent(validStatus -> this.status = validStatus);
-    }
-
-    public RentalStatus getStatusEnum() {
-        return status;
-    }
-
-    public String getStatus() {
-        return status.name();
+    public Rental(UUID tenantUserId, UUID propertyId, UUID ownerUserId, String submittedTenantName, String submittedTenantPhone, LocalDate rentalStartDate, Integer rentalDurationMonths) {
+        this.tenantUserId = tenantUserId;
+        this.propertyId = propertyId;
+        this.ownerUserId = ownerUserId; // Must be fetched/provided
+        this.submittedTenantName = submittedTenantName;
+        this.submittedTenantPhone = submittedTenantPhone;
+        this.rentalStartDate = rentalStartDate;
+        this.rentalDurationMonths = rentalDurationMonths;
+        this.status = RentalStatus.PENDING_APPROVAL;
+        calculateAndSetEndDate();
     }
 
 }
