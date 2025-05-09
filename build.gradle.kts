@@ -25,6 +25,12 @@ repositories {
     mavenCentral()
 }
 
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2022.0.4")
+    }
+}
+
 val seleniumJavaVersion = "4.14.1"
 val seleniumJupiterVersion = "5.0.1"
 val webdrivermanagerVersion = "5.6.3"
@@ -57,6 +63,9 @@ dependencies {
     implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    implementation("org.springframework.cloud:spring-cloud-starter-config")
+
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 }
 
 tasks.register<Test>("unitTest") {
