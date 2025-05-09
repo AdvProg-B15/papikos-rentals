@@ -11,10 +11,8 @@ import id.ac.ui.cs.advprog.papikos.rentals.repository.RentalRepository;
 import id.ac.ui.cs.advprog.papikos.rentals.service.RentalServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -91,7 +89,7 @@ class RentalServiceImplTest {
         when(kosServiceClient.getActiveRentalsCountForKos(KosId)).thenReturn(0L);
         when(rentalRepository.save(any(Rental.class))).thenAnswer(invocation -> {
             Rental r = invocation.getArgument(0);
-            if (r.getId() == null) r.setId(UUID.randomUUID()); // Simulate ID generation by save or @PrePersist
+            if (r.getId() == null) r.setId(UUID.randomUUID());
             return r;
         });
         doNothing().when(notificationServiceClient).sendNotification(any(NotificationRequest.class));
@@ -149,7 +147,7 @@ class RentalServiceImplTest {
 
         List<RentalDto> results = rentalService.getOwnerRentals(ownerUserId, null, null);
         assertFalse(results.isEmpty());
-        assertEquals(sampleRental.getRentalId(), results.get(0).getRentalId());
+        assertEquals(sampleRental.getId(), results.get(0).getRentalId());
     }
 
     @Test
