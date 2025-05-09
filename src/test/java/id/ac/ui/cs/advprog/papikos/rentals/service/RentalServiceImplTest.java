@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.papikos.rentals.service;
 import id.ac.ui.cs.advprog.papikos.rentals.client.*;
 import id.ac.ui.cs.advprog.papikos.rentals.dto.RentalApplicationRequest;
 import id.ac.ui.cs.advprog.papikos.rentals.dto.RentalDto;
+import id.ac.ui.cs.advprog.papikos.rentals.dto.UpdateRentalSubmissionRequest;
 import id.ac.ui.cs.advprog.papikos.rentals.exception.*;
 import id.ac.ui.cs.advprog.papikos.rentals.model.Rental;
 import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
