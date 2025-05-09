@@ -3,6 +3,7 @@ plugins {
     jacoco
     id("org.springframework.boot") version "3.4.4"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.sonarqube") version "4.4.1.3373"
 }
 
 group = "id.ac.ui.cs.advprog.papikos"
@@ -55,6 +56,7 @@ dependencies {
     implementation("jakarta.validation:jakarta.validation-api:3.0.2")
     implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+
 }
 
 tasks.register<Test>("unitTest") {
@@ -89,4 +91,20 @@ tasks.test{
 
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+sonarqube {
+    properties {
+        property("sonar.projectKey", "rentals")
+        property("sonar.host.url", "http://localhost:9000")
+        property("sonar.language", "kotlin")
+        property("sonar.sources", "src/main/java/id/ac/ui/cs/advprog/papikos/rentals")
+        property("sonar.tests", "src/test/java/id/ac/ui/cs/advprog/papikos/rentals")
+        setProperty("sonar.junit.reportPaths", listOf("build/test-results/test"))
+        setProperty("sonar.coverage.jacoco.xmlReportPaths", listOf("build/reports/jacoco/test/jacocoTestReport.xml"))
+    }
 }
