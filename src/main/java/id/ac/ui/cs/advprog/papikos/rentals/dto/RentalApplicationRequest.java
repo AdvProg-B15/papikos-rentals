@@ -13,13 +13,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class RentalApplicationRequest {
     @NotNull
-    private UUID propertyId;
+    private UUID kosId;
 
     @NotBlank
     private String submittedTenantName;
 
     @NotBlank
-    private String submittedTenantPhone; // Basic validation, could be more complex
+    private String submittedTenantPhone;
 
     @NotNull
     @FutureOrPresent

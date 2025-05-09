@@ -7,13 +7,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-@Builder // Useful for constructing DTOs in service/tests
+@Builder
 public class RentalDto {
     private UUID rentalId;
     private UUID tenantUserId;
-    private UUID propertyId;
+    private UUID kosId;
     private UUID ownerUserId;
-    private String propertyName; // Added for better UI display
+    private String kosName;
     private String submittedTenantName;
     private String submittedTenantPhone;
     private LocalDate rentalStartDate;
