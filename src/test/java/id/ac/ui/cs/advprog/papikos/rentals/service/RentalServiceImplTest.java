@@ -1,193 +1,297 @@
 package id.ac.ui.cs.advprog.papikos.rentals.service;
 
-import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
-import id.ac.ui.cs.advprog.papikos.rentals.model.KosDummy;
+import id.ac.ui.cs.advprog.papikos.rentals.client.*;
+import id.ac.ui.cs.advprog.papikos.rentals.dto.RentalApplicationRequest;
+import id.ac.ui.cs.advprog.papikos.rentals.dto.RentalDto;
+import id.ac.ui.cs.advprog.papikos.rentals.exception.*;
 import id.ac.ui.cs.advprog.papikos.rentals.model.Rental;
-import id.ac.ui.cs.advprog.papikos.rentals.model.TenantDummy;
+import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
+import id.ac.ui.cs.advprog.papikos.rentals.repository.RentalRepository;
+import id.ac.ui.cs.advprog.papikos.rentals.service.RentalServiceImpl;
+
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import id.ac.ui.cs.advprog.papikos.rentals.repository.RentalRepository;
 
-import java.util.*;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RentalServiceImplTest {
 
     @Mock
-    RentalRepository rentalRepository;
+    private RentalRepository rentalRepository;
+    @Mock
+    private KosServiceClient kosServiceClient;
+    @Mock
+    private AuthServiceClient authServiceClient;
+    @Mock
+    private NotificationServiceClient notificationServiceClient;
 
     @InjectMocks
-    RentalServiceImpl rentalService;
+    private RentalServiceImpl rentalService;
 
-    Rental rental1;
-    Rental rentalForUpdate;
-    KosDummy dummyKos;
-    TenantDummy dummyTenant;
-    String rental1Id;
+    private RentalApplicationRequest applicationRequest;
+    private UpdateRentalSubmissionRequest updateRequest;
+    private UUID tenantUserId;
+    private UUID KosId;
+    private UUID ownerUserId;
+    private UUID rentalId;
+    private Rental sampleRental;
+    private KosDetailsDto mockKosDetails;
 
     @BeforeEach
     void setUp() {
-        // Data dummy untuk tes
-        dummyKos = new KosDummy();
-        dummyKos.setId(UUID.randomUUID().toString());
-        dummyTenant = new TenantDummy();
-        dummyTenant.setId(UUID.randomUUID().toString());
+        tenantUserId = UUID.randomUUID();
+        KosId = UUID.randomUUID();
+        ownerUserId = UUID.randomUUID();
+        rentalId = UUID.randomUUID();
 
-        rental1Id = UUID.randomUUID().toString();
-        rental1 = new Rental(rental1Id, dummyKos, dummyTenant, "Penyewa Satu", "081111", "2024-01-01", 3);
+        applicationRequest = new RentalApplicationRequest();
+        applicationRequest.setKosId(KosId);
+        applicationRequest.setSubmittedTenantName("Test Tenant");
+        applicationRequest.setSubmittedTenantPhone("08123456789");
+        applicationRequest.setRentalStartDate(LocalDate.now().plusDays(7));
+        applicationRequest.setRentalDurationMonths(6);
 
-        // Data untuk update (bisa objek baru atau modifikasi yg lama)
-        rentalForUpdate = new Rental(rental1Id, dummyKos, dummyTenant, "Penyewa Satu Update", "081111-NEW", "2024-01-01", 4, RentalStatus.CONFIRMED.name());
+        updateRequest = new UpdateRentalSubmissionRequest();
+        updateRequest.setSubmittedTenantName("Updated Name");
+        updateRequest.setRentalDurationMonths(7);
+
+        mockKosDetails = new KosDetailsDto(KosId, ownerUserId, "Test Kos", 5, true);
+
+        sampleRental = new Rental();
+        sampleRental.setId(rentalId);
+        sampleRental.setTenantUserId(tenantUserId);
+        sampleRental.setKosId(KosId);
+        sampleRental.setOwnerUserId(ownerUserId);
+        sampleRental.setStatus(RentalStatus.PENDING_APPROVAL);
+        sampleRental.setSubmittedTenantName(applicationRequest.getSubmittedTenantName());
+        sampleRental.setSubmittedTenantPhone(applicationRequest.getSubmittedTenantPhone());
+        sampleRental.setRentalStartDate(applicationRequest.getRentalStartDate());
+        sampleRental.setRentalDurationMonths(applicationRequest.getRentalDurationMonths());
+        sampleRental.setRentalEndDate(applicationRequest.getRentalStartDate().plusMonths(applicationRequest.getRentalDurationMonths()));
     }
 
     @Test
-    void testCreateRental_whenIdNotExists_shouldSaveRental() {
-        when(rentalRepository.findById(rental1.getId())).thenReturn(Optional.empty());
-        when(rentalRepository.save(any(Rental.class))).thenReturn(rental1); // Gunakan any() jika objeknya dibuat di dalam service
+    void submitRentalApplication_Success() {
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(mockKosDetails);
+        when(kosServiceClient.getActiveRentalsCountForKos(KosId)).thenReturn(0L);
+        when(rentalRepository.save(any(Rental.class))).thenAnswer(invocation -> {
+            Rental r = invocation.getArgument(0);
+            if (r.getId() == null) r.setId(UUID.randomUUID()); // Simulate ID generation by save or @PrePersist
+            return r;
+        });
+        doNothing().when(notificationServiceClient).sendNotification(any(NotificationRequest.class));
 
-        Rental createdRental = rentalService.createRental(rental1);
+        RentalDto result = rentalService.submitRentalApplication(tenantUserId, applicationRequest);
 
-        assertNotNull(createdRental);
-        assertEquals(rental1.getId(), createdRental.getId());
-        assertEquals(RentalStatus.PENDING, createdRental.getStatusEnum()); // Cek status default
-
-        verify(rentalRepository, times(1)).findById(rental1.getId());
-        verify(rentalRepository, times(1)).save(rental1); // atau any(Rental.class)
+        assertNotNull(result);
+        assertNotNull(result.getRentalId());
+        assertEquals(KosId, result.getKosId());
+        assertEquals(tenantUserId, result.getTenantUserId());
+        assertEquals(RentalStatus.PENDING_APPROVAL.toString(), result.getStatus());
+        verify(rentalRepository).save(any(Rental.class));
+        verify(notificationServiceClient).sendNotification(any(NotificationRequest.class));
     }
 
     @Test
-    void testCreateRental_whenIdExists_shouldThrowIllegalArgumentException() {
-        when(rentalRepository.findById(rental1.getId())).thenReturn(Optional.of(rental1));
-
-        assertThrows(IllegalArgumentException.class, () -> {
-            rentalService.createRental(rental1);
-        }, "Should throw IllegalArgumentException when rental ID already exists");
-
-        verify(rentalRepository, times(1)).findById(rental1.getId());
-        verify(rentalRepository, never()).save(any(Rental.class));
+    void submitRentalApplication_KosNotFound() {
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(null);
+        assertThrows(ResourceNotFoundException.class, () -> rentalService.submitRentalApplication(tenantUserId, applicationRequest));
+        verify(rentalRepository, never()).save(any());
     }
 
     @Test
-    void testUpdateRental_whenIdExists_shouldUpdateAndSaveRental() {
-        when(rentalRepository.findById(rental1Id)).thenReturn(Optional.of(rental1));
-        when(rentalRepository.save(any(Rental.class))).thenAnswer(invocation -> invocation.getArgument(0)); // Mengembalikan argumen yang diterima save
-
-        Rental updatedRental = rentalService.updateRental(rental1Id, rentalForUpdate); // rentalForUpdate berisi data baru
-
-        assertNotNull(updatedRental);
-        assertEquals(rental1Id, updatedRental.getId());
-        assertEquals("Penyewa Satu Update", updatedRental.getFullName()); // Cek data baru
-        assertEquals(4, updatedRental.getDurationMonths()); // Cek data baru
-        assertEquals(RentalStatus.CONFIRMED, updatedRental.getStatusEnum()); // Cek data baru
-
-        verify(rentalRepository, times(1)).findById(rental1Id);
-        verify(rentalRepository, times(1)).save(argThat(savedRental ->
-                savedRental.getId().equals(rental1Id) &&
-                        savedRental.getFullName().equals("Penyewa Satu Update") &&
-                        savedRental.getDurationMonths() == 4 &&
-                        savedRental.getStatusEnum() == RentalStatus.CONFIRMED
-        ));
+    void submitRentalApplication_KosNotListed() {
+        KosDetailsDto unlistedKos = new KosDetailsDto(KosId, ownerUserId, "Test Kos", 5, false);
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(unlistedKos);
+        assertThrows(ValidationException.class, () -> rentalService.submitRentalApplication(tenantUserId, applicationRequest));
     }
 
     @Test
-    void testUpdateRental_whenIdNotExists_shouldThrowNoSuchElementException() {
-        when(rentalRepository.findById(rental1Id)).thenReturn(Optional.empty());
+    void submitRentalApplication_NoVacancy() {
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(mockKosDetails);
+        when(kosServiceClient.getActiveRentalsCountForKos(KosId)).thenReturn(5L); // Max rooms = 5
+        assertThrows(ValidationException.class, () -> rentalService.submitRentalApplication(tenantUserId, applicationRequest));
+    }
 
-        assertThrows(NoSuchElementException.class, () -> {
-            rentalService.updateRental(rental1Id, rentalForUpdate);
-        }, "Should throw NoSuchElementException when rental ID not found for update");
+    // --- Get Tenant Rentals ---
+    @Test
+    void getTenantRentals_Success() {
+        when(rentalRepository.findByTenantUserId(tenantUserId)).thenReturn(List.of(sampleRental));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
 
-        verify(rentalRepository, times(1)).findById(rental1Id);
-        verify(rentalRepository, never()).save(any(Rental.class));
+        List<RentalDto> results = rentalService.getTenantRentals(tenantUserId);
+
+        assertFalse(results.isEmpty());
+        assertEquals(1, results.size());
+        assertEquals(sampleRental.getId(), results.get(0).getRentalId());
+    }
+
+    // --- Get Owner Rentals ---
+    @Test
+    void getOwnerRentals_Success() {
+        when(rentalRepository.findByOwnerUserId(ownerUserId)).thenReturn(List.of(sampleRental));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
+
+        List<RentalDto> results = rentalService.getOwnerRentals(ownerUserId, null, null);
+        assertFalse(results.isEmpty());
+        assertEquals(sampleRental.getRentalId(), results.get(0).getRentalId());
     }
 
     @Test
-    void testFindRentalById_whenIdExists_shouldReturnRental() {
-        when(rentalRepository.findById(rental1Id)).thenReturn(Optional.of(rental1));
+    void getOwnerRentals_Filtered_Success() {
+        Rental rental2 = new Rental(); // Another rental for different Kos or status
+        // ... setup rental2 ...
 
-        Rental foundRental = rentalService.findRentalById(rental1Id);
+        // This test needs more specific mocking for the filtering logic inside getOwnerRentals
+        // For simplicity, assuming the repository call itself is what we'd refine or that findAll + stream filter is tested
+        when(rentalRepository.findAll()).thenReturn(List.of(sampleRental)); // Mock a broader set if filtering in service
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(mockKosDetails);
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
 
-        assertNotNull(foundRental);
-        assertEquals(rental1Id, foundRental.getId());
 
-        verify(rentalRepository, times(1)).findById(rental1Id);
+        List<RentalDto> results = rentalService.getOwnerRentals(ownerUserId, RentalStatus.PENDING_APPROVAL, KosId);
+        assertFalse(results.isEmpty());
+        assertEquals(sampleRental.getId(), results.get(0).getRentalId());
+    }
+
+
+    // --- Get Rental By ID ---
+    @Test
+    void getRentalById_TenantSuccess() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
+
+        RentalDto result = rentalService.getRentalById(rentalId, tenantUserId); // tenantUserId is the requester
+        assertEquals(rentalId, result.getRentalId());
     }
 
     @Test
-    void testFindRentalById_whenIdNotExists_shouldThrowNoSuchElementException() {
-        when(rentalRepository.findById(rental1Id)).thenReturn(Optional.empty());
+    void getRentalById_OwnerSuccess() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
 
-        assertThrows(NoSuchElementException.class, () -> {
-            rentalService.findRentalById(rental1Id);
-        }, "Should throw NoSuchElementException when rental ID not found");
-
-        verify(rentalRepository, times(1)).findById(rental1Id);
+        RentalDto result = rentalService.getRentalById(rentalId, ownerUserId); // ownerUserId is the requester
+        assertEquals(rentalId, result.getRentalId());
     }
 
     @Test
-    void testFindAllRentals_shouldReturnListOfRentals() {
-        List<Rental> rentalList = Arrays.asList(rental1, new Rental(UUID.randomUUID().toString(), dummyKos, dummyTenant, "Penyewa Dua", "082222", "2024-02-01", 6));
-        when(rentalRepository.findAll()).thenReturn(rentalList);
-
-        List<Rental> foundRentals = rentalService.findAllRentals();
-
-        assertNotNull(foundRentals);
-        assertEquals(2, foundRentals.size());
-        assertEquals(rentalList, foundRentals); // Atau cek elemen individual
-
-        verify(rentalRepository, times(1)).findAll();
+    void getRentalById_NotFound() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> rentalService.getRentalById(rentalId, tenantUserId));
     }
 
     @Test
-    void testFindAllRentals_whenNoRentals_shouldReturnEmptyList() {
-        when(rentalRepository.findAll()).thenReturn(Collections.emptyList());
-
-        List<Rental> foundRentals = rentalService.findAllRentals();
-
-        assertNotNull(foundRentals);
-        assertTrue(foundRentals.isEmpty());
-
-        verify(rentalRepository, times(1)).findAll();
+    void getRentalById_Forbidden() {
+        UUID otherUserId = UUID.randomUUID();
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        // No need to mock kosServiceClient as ForbiddenException should be thrown before
+        assertThrows(ForbiddenException.class, () -> rentalService.getRentalById(rentalId, otherUserId));
     }
 
-     @Test
-     void testCancelRental_whenIdExists_shouldUpdateStatusToCancelledAndSave() {
-         // Arrange: Atur mock findById untuk menemukan rental
-         when(rentalRepository.findById(rental1Id)).thenReturn(Optional.of(rental1));
-         // Arrange: Atur mock save
-         when(rentalRepository.save(any(Rental.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    // --- Edit Rental Submission ---
+    @Test
+    void editRentalSubmission_Success() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental)); // sampleRental has PENDING_APPROVAL status
+        when(rentalRepository.save(any(Rental.class))).thenReturn(sampleRental); // Return the same object for simplicity
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
 
-         // Act: Panggil service method
-         rentalService.cancelRental(rental1Id);
 
-         // Verify: Pastikan findById dipanggil sekali
-         verify(rentalRepository, times(1)).findById(rental1Id);
-         // Verify: Pastikan save dipanggil sekali dengan status CANCELLED
-         verify(rentalRepository, times(1)).save(argThat(savedRental ->
-                 savedRental.getId().equals(rental1Id) &&
-                 savedRental.getStatusEnum() == RentalStatus.CANCELLED
-         ));
-          verify(rentalRepository, never()).deleteById(anyString()); // Pastikan delete tidak dipanggil
-     }
+        RentalDto result = rentalService.editRentalSubmission(rentalId, tenantUserId, updateRequest);
+        assertEquals("Updated Name", result.getSubmittedTenantName()); // Verify one of the changes
+        verify(rentalRepository).save(sampleRental);
+    }
 
     @Test
-    void testCancelRental_whenIdNotExists_shouldThrowNoSuchElementException() {
-        when(rentalRepository.findById(rental1Id)).thenReturn(Optional.empty());
+    void editRentalSubmission_NotPendingApproval() {
+        sampleRental.setStatus(RentalStatus.APPROVED);
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        assertThrows(ValidationException.class, () -> rentalService.editRentalSubmission(rentalId, tenantUserId, updateRequest));
+    }
 
-        assertThrows(NoSuchElementException.class, () -> {
-            rentalService.cancelRental(rental1Id);
-        }, "Should throw NoSuchElementException when rental ID not found for cancellation");
+    @Test
+    void editRentalSubmission_Forbidden() {
+        UUID wrongTenantId = UUID.randomUUID();
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        assertThrows(ForbiddenException.class, () -> rentalService.editRentalSubmission(rentalId, wrongTenantId, updateRequest));
+    }
 
-        verify(rentalRepository, times(1)).findById(rental1Id);
-        verify(rentalRepository, never()).deleteById(anyString());
-        // Verify: Pastikan save TIDAK pernah dipanggil
-        verify(rentalRepository, never()).save(any(Rental.class));
+    // --- Cancel Rental ---
+    @Test
+    void cancelRental_TenantSuccess() {
+        sampleRental.setStatus(RentalStatus.APPROVED); // Can cancel an approved rental
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        when(rentalRepository.save(any(Rental.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
+        doNothing().when(notificationServiceClient).sendNotification(any(NotificationRequest.class));
+
+
+        RentalDto result = rentalService.cancelRental(rentalId, tenantUserId, "TENANT");
+        assertEquals(RentalStatus.CANCELLED.toString(), result.getStatus());
+        verify(rentalRepository).save(argThat(r -> r.getStatus() == RentalStatus.CANCELLED));
+        verify(notificationServiceClient).sendNotification(any(NotificationRequest.class));
+    }
+
+    @Test
+    void cancelRental_AlreadyCancelled() {
+        sampleRental.setStatus(RentalStatus.CANCELLED);
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+
+        assertThrows(ValidationException.class, () -> rentalService.cancelRental(rentalId, tenantUserId, "TENANT"));
+    }
+
+
+    // --- Approve Rental ---
+    @Test
+    void approveRental_OwnerSuccess() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental)); // PENDING_APPROVAL
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(mockKosDetails);
+        when(kosServiceClient.getActiveRentalsCountForKos(KosId)).thenReturn(0L); // Vacancy
+        when(rentalRepository.save(any(Rental.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
+        doNothing().when(notificationServiceClient).sendNotification(any(NotificationRequest.class));
+
+        RentalDto result = rentalService.approveRental(rentalId, ownerUserId);
+        assertEquals(RentalStatus.APPROVED.toString(), result.getStatus());
+        verify(rentalRepository).save(argThat(r -> r.getStatus() == RentalStatus.APPROVED));
+        verify(notificationServiceClient).sendNotification(any(NotificationRequest.class));
+    }
+
+    @Test
+    void approveRental_NoVacancy() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental));
+        when(kosServiceClient.getKosDetails(KosId)).thenReturn(mockKosDetails);
+        when(kosServiceClient.getActiveRentalsCountForKos(KosId)).thenReturn((long) mockKosDetails.getTotalRooms()); // No vacancy
+
+        assertThrows(ValidationException.class, () -> rentalService.approveRental(rentalId, ownerUserId));
+        verify(rentalRepository, never()).save(any());
+    }
+
+
+    // --- Reject Rental ---
+    @Test
+    void rejectRental_OwnerSuccess() {
+        when(rentalRepository.findById(rentalId)).thenReturn(Optional.of(sampleRental)); // PENDING_APPROVAL
+        when(rentalRepository.save(any(Rental.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(kosServiceClient.getKosDetails(sampleRental.getKosId())).thenReturn(mockKosDetails);
+        doNothing().when(notificationServiceClient).sendNotification(any(NotificationRequest.class));
+
+        RentalDto result = rentalService.rejectRental(rentalId, ownerUserId);
+        assertEquals(RentalStatus.REJECTED.toString(), result.getStatus());
+        verify(rentalRepository).save(argThat(r -> r.getStatus() == RentalStatus.REJECTED));
+        verify(notificationServiceClient).sendNotification(any(NotificationRequest.class));
     }
 }
