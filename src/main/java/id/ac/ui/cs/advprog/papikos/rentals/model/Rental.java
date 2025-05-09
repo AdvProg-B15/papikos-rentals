@@ -3,9 +3,7 @@ package id.ac.ui.cs.advprog.papikos.rentals.model;
 import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -16,6 +14,8 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Data
 @Entity
 @Table(name = "rentals")
 public class Rental {
@@ -26,13 +26,13 @@ public class Rental {
     private UUID id;
 
     @Column(name = "tenant_user_id", nullable = false)
-    private UUID tenantUserId; // Store only the ID
+    private UUID tenantUserId;
 
-    @Column(name = "property_id", nullable = false)
-    private UUID propertyId; // Store only the ID
+    @Column(name = "kos_id", nullable = false)
+    private UUID kosId;
 
     @Column(name = "owner_user_id", nullable = false)
-    private UUID ownerUserId; // Store only the ID (denormalized)
+    private UUID ownerUserId;
 
     @Column(name = "submitted_tenant_name", nullable = false, length = 255)
     private String submittedTenantName;
@@ -51,7 +51,7 @@ public class Rental {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private RentalStatus status = RentalStatus.PENDING_APPROVAL; // Default status
+    private RentalStatus status = RentalStatus.PENDING_APPROVAL;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -61,29 +61,23 @@ public class Rental {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-
-    /**
-     * Calculates and sets the rental end date based on start date and duration.
-     * Should be called before saving/updating if start date or duration changes.
-     */
-    public void calculateAndSetEndDate() {
-        if (this.rentalStartDate != null && this.rentalDurationMonths != null && this.rentalDurationMonths > 0) {
-            this.rentalEndDate = this.rentalStartDate.plusMonths(this.rentalDurationMonths).minusDays(1); // Often end date is inclusive last day
-        } else {
-            this.rentalEndDate = null;
+    @PrePersist
+    protected void onCreate() {
+        if (this.id == null) {
+            this.id = UUID.randomUUID();
+        }
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        if (rentalStartDate != null && rentalDurationMonths > 0) {
+            rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
         }
     }
 
-    public Rental(UUID tenantUserId, UUID propertyId, UUID ownerUserId, String submittedTenantName, String submittedTenantPhone, LocalDate rentalStartDate, Integer rentalDurationMonths) {
-        this.tenantUserId = tenantUserId;
-        this.propertyId = propertyId;
-        this.ownerUserId = ownerUserId; // Must be fetched/provided
-        this.submittedTenantName = submittedTenantName;
-        this.submittedTenantPhone = submittedTenantPhone;
-        this.rentalStartDate = rentalStartDate;
-        this.rentalDurationMonths = rentalDurationMonths;
-        this.status = RentalStatus.PENDING_APPROVAL;
-        calculateAndSetEndDate();
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+        if (rentalStartDate != null && rentalDurationMonths > 0) {
+            rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
+        }
     }
-
 }
