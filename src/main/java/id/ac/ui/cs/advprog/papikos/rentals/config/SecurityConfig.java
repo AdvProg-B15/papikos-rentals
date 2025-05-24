@@ -32,10 +32,9 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                // Define public GET endpoints
                                 .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/v1/kos/search").permitAll() // Assuming search is public
-                                .requestMatchers(HttpMethod.GET, "/api/v1/kos/{kosId}").permitAll() // Assuming find by ID is public
+                                .requestMatchers(HttpMethod.GET, "/api/v1/rentals/my").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/v1/rentals/owner").permitAll()
                                 // All other requests must be authenticated
                                 .anyRequest().authenticated()
                 )
