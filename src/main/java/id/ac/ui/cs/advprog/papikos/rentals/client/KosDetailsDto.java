@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.UUID;
 
 @Getter
@@ -15,23 +16,23 @@ import java.util.UUID;
 @AllArgsConstructor
 public class KosDetailsDto {
 
-    @JsonProperty("id")
-    private UUID kosId;
+    private UUID id;
 
     private UUID ownerUserId;
 
     private String name;
 
-    @JsonProperty("numRooms")
-    private int totalRooms;
+    private String address;
+
+    private String description;
+
+    private int numRooms;
 
     @JsonProperty("isListed")
-    private boolean listed;
+    private boolean isListed;
 
     private BigDecimal monthlyRentPrice;
 
-    public boolean isListed() {
-        return listed;
-    }
-    public void setListed(boolean listed) { this.listed = listed; }
+    private Date createdAt;
+    private Date updatedAt;
 }

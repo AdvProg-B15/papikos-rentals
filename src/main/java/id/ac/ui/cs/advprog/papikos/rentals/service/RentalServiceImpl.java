@@ -1,5 +1,8 @@
 package id.ac.ui.cs.advprog.papikos.rentals.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.papikos.rentals.client.*;
 import id.ac.ui.cs.advprog.papikos.rentals.config.RabbitMQConfig;
 import id.ac.ui.cs.advprog.papikos.rentals.dto.*;
@@ -12,10 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,12 +40,35 @@ public class RentalServiceImpl implements RentalService {
     private final KosServiceClient kosServiceClient;
     private final NotificationServiceClient notificationServiceClient;
     private final RabbitTemplate rabbitTemplate;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    public void tryFetchKosDetail(UUID kosId) {
+        try {
+            KosDetailsDto kos=  fetchKosDetails(kosId);
+            log.info("Fetched Kos details successfully: {} {}", kos.getName(), kos.getId());
+        } catch (Exception e) {
+            log.error("Error fetching Kos details: {}", e.getMessage(), e);
+            throw new ServiceUnavailableException("Failed to fetch Kos details. Please try again later.");
+        }
+    }
 
     // Helper method to fetch and unwrap KosDetailsDto
     private KosDetailsDto fetchKosDetails(UUID kosId) {
         KosApiResponseWrapper<KosDetailsDto> responseWrapper;
         try {
             responseWrapper = kosServiceClient.getKosDetailsApiResponse(kosId);
+//            ResponseEntity<String> response = restTemplate.exchange(
+//                    "http://localhost:8081/api/v1/" + kosId,
+//                    HttpMethod.GET,
+//                    new HttpEntity<>(new HttpHeaders() {{
+//                        set("X-Internal-Token", internalTokenSecret);
+//                    }}),
+//                    String.class);
+//
+//            responseWrapper = objectMapper.readValue(response.getBody(),
+//                    objectMapper.getTypeFactory().constructParametricType(KosApiResponseWrapper.class, KosDetailsDto.class));
+
         } catch (FeignException e) {
             log.error("FeignException while fetching Kos details for ID {}: Status {}, Body {}",
                     kosId, e.status(), e.contentUTF8(), e);
@@ -86,7 +114,7 @@ public class RentalServiceImpl implements RentalService {
         List<RentalStatus> consideredActiveStatuses = Arrays.asList(RentalStatus.APPROVED, RentalStatus.ACTIVE);
         List<Rental> activeRentalsForThisKos = rentalRepository.findByKosIdAndStatusIn(request.getKosId(), consideredActiveStatuses);
 
-        if (activeRentalsForThisKos.size() >= kosDetails.getTotalRooms()) {
+        if (activeRentalsForThisKos.size() >= kosDetails.getNumRooms()) {
             throw new ValidationException("No rooms available for kos ID: " + request.getKosId());
         }
 
@@ -111,7 +139,7 @@ public class RentalServiceImpl implements RentalService {
                 savedRental.getId()
         );
 
-        id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent event = id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent.builder()
+        RentalEvent event = RentalEvent.builder()
                 .rentalId(savedRental.getId().toString())
                 .userId(savedRental.getTenantUserId().toString())
                 .kosId(savedRental.getKosId().toString())
@@ -194,9 +222,11 @@ public class RentalServiceImpl implements RentalService {
         }
 
         if (request.getSubmittedTenantName() != null) rental.setSubmittedTenantName(request.getSubmittedTenantName());
-        if (request.getSubmittedTenantPhone() != null) rental.setSubmittedTenantPhone(request.getSubmittedTenantPhone());
+        if (request.getSubmittedTenantPhone() != null)
+            rental.setSubmittedTenantPhone(request.getSubmittedTenantPhone());
         if (request.getRentalStartDate() != null) rental.setRentalStartDate(request.getRentalStartDate());
-        if (request.getRentalDurationMonths() != null) rental.setRentalDurationMonths(request.getRentalDurationMonths());
+        if (request.getRentalDurationMonths() != null)
+            rental.setRentalDurationMonths(request.getRentalDurationMonths());
 
         Rental updatedRental = rentalRepository.save(rental);
         log.info("Rental submission edited: {}", updatedRental.getId());
@@ -251,7 +281,7 @@ public class RentalServiceImpl implements RentalService {
         List<RentalStatus> consideredActiveStatuses = Arrays.asList(RentalStatus.APPROVED, RentalStatus.ACTIVE);
         List<Rental> activeRentalsForThisKos = rentalRepository.findByKosIdAndStatusIn(rental.getKosId(), consideredActiveStatuses);
 
-        if (activeRentalsForThisKos.size() >= kosDetails.getTotalRooms()) {
+        if (activeRentalsForThisKos.size() >= kosDetails.getNumRooms()) {
             throw new ValidationException("No rooms available to approve this rental for kos ID: " + rental.getKosId() + ". Another rental might have been approved concurrently.");
         }
 
