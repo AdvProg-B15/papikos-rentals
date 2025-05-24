@@ -75,7 +75,7 @@ public class RentalServiceImpl implements RentalService {
                 savedRental.getTenantUserId().toString(),
                 savedRental.getKosId().toString(),
                 savedRental.getOwnerUserId().toString(),
-                kosDetails.getName(), // kosName from kosDetails
+                kosDetails.getName(),
                 savedRental.getRentalStartDate(),
                 savedRental.getRentalDurationMonths(),
                 kosDetails.getPricePerMonth(),
@@ -221,6 +221,30 @@ public class RentalServiceImpl implements RentalService {
                 "Congratulations! Your rental application for kos '" + getKosName(approvedRental.getKosId()) + "' has been approved. Please proceed with payment.",
                 approvedRental.getId()
         );
+
+        RentalEvent approvedEvent = new RentalEvent(
+                approvedRental.getId().toString(),
+                approvedRental.getTenantUserId().toString(),
+                approvedRental.getKosId().toString(),
+                approvedRental.getOwnerUserId().toString(),
+                kosDetails.getName(),
+                approvedRental.getRentalStartDate(),
+                approvedRental.getRentalDurationMonths(),
+                kosDetails.getPricePerMonth(), // Or a calculated final price
+                RentalStatus.APPROVED.name(), // Explicitly "APPROVED"
+                approvedRental.getSubmittedTenantName(),
+                approvedRental.getSubmittedTenantPhone()
+        );
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.TOPIC_EXCHANGE_NAME,
+                    RabbitMQConfig.ROUTING_KEY_RENTAL_APPROVED, // Use a specific key for approved
+                    approvedEvent);
+            log.info("Published rental.approved event for rentalId {}: {}", approvedRental.getId(), approvedEvent);
+        } catch (Exception e) {
+            log.error("Failed to publish rental.approved event for rentalId {}: {}", approvedRental.getId(), e.getMessage(), e);
+        }
+
         return mapToRentalDto(approvedRental, getKosName(approvedRental.getKosId()));
     }
 

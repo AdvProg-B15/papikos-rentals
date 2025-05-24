@@ -1,8 +1,5 @@
 package id.ac.ui.cs.advprog.papikos.rentals.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -16,6 +13,7 @@ public class RabbitMQConfig {
 
     public static final String TOPIC_EXCHANGE_NAME = "rental.topic";
     public static final String ROUTING_KEY_RENTAL_CREATED = "rental.created";
+    public static final String ROUTING_KEY_RENTAL_APPROVED = "rental.approved";
 
     @Bean
     public TopicExchange rentalTopicExchange() {
@@ -33,12 +31,4 @@ public class RabbitMQConfig {
         rabbitTemplate.setMessageConverter(jsonMessageConverter());
         return rabbitTemplate;
     }
-
-    // --- Beans specific to each consumer service will declare their Queues and Bindings ---
-    // For example, in KosService:
-    // public static final String KOS_QUEUE_NAME = "kos.rental.created.queue";
-    // @Bean Queue kosQueue() { return new Queue(KOS_QUEUE_NAME, false); } // false = durable
-    // @Bean Binding kosBinding(Queue kosQueue, TopicExchange exchange) {
-    //    return BindingBuilder.bind(kosQueue).to(exchange).with(ROUTING_KEY_RENTAL_CREATED);
-    // }
 }
