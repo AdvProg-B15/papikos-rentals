@@ -1,27 +1,37 @@
 package id.ac.ui.cs.advprog.papikos.rentals.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class KosDetailsDto {
+
+    @JsonProperty("id")
     private UUID kosId;
+
     private UUID ownerUserId;
+
     private String name;
+
+    @JsonProperty("numRooms")
     private int totalRooms;
-    private boolean isListed;
-    private BigDecimal pricePerMonth;
 
-    public KosDetailsDto(UUID kosId, UUID ownerUserId, String name, int totalRooms, boolean isListed, BigDecimal pricePerMonth) {
-        this.kosId = kosId;
-        this.ownerUserId = ownerUserId;
-        this.name = name;
-        this.totalRooms = totalRooms;
-        this.isListed = isListed;
-        this.pricePerMonth = pricePerMonth;
+    @JsonProperty("isListed")
+    private boolean listed;
+
+    private BigDecimal monthlyRentPrice;
+
+    public boolean isListed() {
+        return listed;
     }
-
-    public boolean isListed() { return isListed; }
+    public void setListed(boolean listed) { this.listed = listed; }
 }

@@ -1,28 +1,32 @@
 package id.ac.ui.cs.advprog.papikos.rentals.service;
 
 import id.ac.ui.cs.advprog.papikos.rentals.client.*;
-import id.ac.ui.cs.advprog.papikos.rentals.config.RabbitMQConfig; // Import RabbitMQ Config
+import id.ac.ui.cs.advprog.papikos.rentals.config.RabbitMQConfig;
 import id.ac.ui.cs.advprog.papikos.rentals.dto.*;
-import id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent; // Import RentalEvent DTO
 import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
 import id.ac.ui.cs.advprog.papikos.rentals.exception.*;
 import id.ac.ui.cs.advprog.papikos.rentals.model.Rental;
 import id.ac.ui.cs.advprog.papikos.rentals.repository.RentalRepository;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate; // Import RabbitTemplate
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
-import java.math.BigDecimal; // For potential price in event
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor // This will inject RabbitTemplate if it's final
+@RequiredArgsConstructor
 public class RentalServiceImpl implements RentalService {
 
     private static final Logger log = LoggerFactory.getLogger(RentalServiceImpl.class);
@@ -32,20 +36,57 @@ public class RentalServiceImpl implements RentalService {
     private final NotificationServiceClient notificationServiceClient;
     private final RabbitTemplate rabbitTemplate;
 
+    // Helper method to fetch and unwrap KosDetailsDto
+    private KosDetailsDto fetchKosDetails(UUID kosId) {
+        KosApiResponseWrapper<KosDetailsDto> responseWrapper;
+        try {
+            responseWrapper = kosServiceClient.getKosDetailsApiResponse(kosId);
+        } catch (FeignException e) {
+            log.error("FeignException while fetching Kos details for ID {}: Status {}, Body {}",
+                    kosId, e.status(), e.contentUTF8(), e);
+            if (e.status() == HttpStatus.NOT_FOUND.value()) {
+                throw new ResourceNotFoundException("Kos not found with ID: " + kosId + " (via Kos Service).");
+            }
+            throw new ServiceUnavailableException("Error fetching Kos details: Kos service unavailable or unexpected error. " + e.getMessage());
+        }
+
+        if (responseWrapper == null) {
+            throw new ServiceUnavailableException("No response from Kos service for Kos ID: " + kosId);
+        }
+
+        // Check the status from the API response wrapper itself
+        if (responseWrapper.getStatus() != HttpStatus.OK.value()) {
+            log.warn("Kos service returned non-OK status ({}) for Kos ID {}: {}",
+                    responseWrapper.getStatus(), kosId, responseWrapper.getMessage());
+            if (responseWrapper.getStatus() == HttpStatus.NOT_FOUND.value()) {
+                throw new ResourceNotFoundException("Kos not found with ID: " + kosId + " (Reported by Kos Service: " + responseWrapper.getMessage() + ")");
+            }
+            // Handle other non-OK statuses as appropriate
+            throw new ServiceInteractionException("Kos service reported an issue for Kos ID " + kosId + ": " +
+                    responseWrapper.getStatus() + " - " + responseWrapper.getMessage());
+        }
+
+        if (responseWrapper.getData() == null) {
+            log.error("Kos service returned OK status but no data for Kos ID {}", kosId);
+            throw new ResourceNotFoundException("Kos details data not found for ID: " + kosId + " (Kos Service returned no data).");
+        }
+        return responseWrapper.getData();
+    }
+
+
     @Override
     @Transactional
     public RentalDto submitRentalApplication(UUID tenantUserId, RentalApplicationRequest request) {
+        KosDetailsDto kosDetails = fetchKosDetails(request.getKosId()); // Use helper
 
-        KosDetailsDto kosDetails = kosServiceClient.getKosDetails(request.getKosId());
-        if (kosDetails == null) {
-            throw new ResourceNotFoundException("Kos not found with ID: " + request.getKosId());
-        }
         if (!kosDetails.isListed()) {
             throw new ValidationException("Kos with ID: " + request.getKosId() + " is not currently listed for rent.");
         }
 
-        long activeRentals = kosServiceClient.getActiveRentalsCountForKos(request.getKosId());
-        if (activeRentals >= kosDetails.getTotalRooms()) {
+        List<RentalStatus> consideredActiveStatuses = Arrays.asList(RentalStatus.APPROVED, RentalStatus.ACTIVE);
+        List<Rental> activeRentalsForThisKos = rentalRepository.findByKosIdAndStatusIn(request.getKosId(), consideredActiveStatuses);
+
+        if (activeRentalsForThisKos.size() >= kosDetails.getTotalRooms()) {
             throw new ValidationException("No rooms available for kos ID: " + request.getKosId());
         }
 
@@ -70,19 +111,21 @@ public class RentalServiceImpl implements RentalService {
                 savedRental.getId()
         );
 
-        RentalEvent event = new RentalEvent(
-                savedRental.getId().toString(),
-                savedRental.getTenantUserId().toString(),
-                savedRental.getKosId().toString(),
-                savedRental.getOwnerUserId().toString(),
-                kosDetails.getName(),
-                savedRental.getRentalStartDate(),
-                savedRental.getRentalDurationMonths(),
-                kosDetails.getPricePerMonth(),
-                "RENTAL_APPLICATION_SUBMITTED",
-                savedRental.getSubmittedTenantName(),
-                savedRental.getSubmittedTenantPhone()
-        );
+        id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent event = id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent.builder()
+                .rentalId(savedRental.getId().toString())
+                .userId(savedRental.getTenantUserId().toString())
+                .kosId(savedRental.getKosId().toString())
+                .kosOwnerId(savedRental.getOwnerUserId().toString())
+                .kosName(kosDetails.getName())
+                .bookingDate(savedRental.getRentalStartDate())
+                .rentalDurationMonths(savedRental.getRentalDurationMonths())
+                .price(kosDetails.getMonthlyRentPrice())
+                .status("RENTAL_APPLICATION_SUBMITTED")
+                .tenantName(savedRental.getSubmittedTenantName())
+                .tenantPhone(savedRental.getSubmittedTenantPhone())
+                .timestamp(LocalDateTime.now().toString())
+                .build();
+
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.TOPIC_EXCHANGE_NAME,
@@ -107,9 +150,10 @@ public class RentalServiceImpl implements RentalService {
     public List<RentalDto> getOwnerRentals(UUID ownerUserId, RentalStatus status, UUID kosIdFilter) {
         List<Rental> rentals;
         if (kosIdFilter != null) {
-            KosDetailsDto pDetails = kosServiceClient.getKosDetails(kosIdFilter);
-            if(pDetails == null || !pDetails.getOwnerUserId().equals(ownerUserId)){
-                throw new ForbiddenException("Access denied to kos rentals.");
+            KosDetailsDto pDetails = fetchKosDetails(kosIdFilter); // Use helper
+            if (!pDetails.getOwnerUserId().equals(ownerUserId)) {
+                log.warn("Owner {} attempted to access rentals for kos {} they do not own.", ownerUserId, kosIdFilter);
+                throw new ForbiddenException("Access denied to kos rentals. You do not own this kos.");
             }
             rentals = rentalRepository.findAll().stream()
                     .filter(r -> r.getOwnerUserId().equals(ownerUserId) && r.getKosId().equals(kosIdFilter))
@@ -120,7 +164,6 @@ public class RentalServiceImpl implements RentalService {
                     .filter(r -> status == null || r.getStatus() == status)
                     .collect(Collectors.toList());
         }
-
         return rentals.stream()
                 .map(rental -> mapToRentalDto(rental, getKosName(rental.getKosId())))
                 .collect(Collectors.toList());
@@ -134,7 +177,6 @@ public class RentalServiceImpl implements RentalService {
         if (!Objects.equals(rental.getTenantUserId(), userId) && !Objects.equals(rental.getOwnerUserId(), userId)) {
             throw new ForbiddenException("User not authorized to view this rental.");
         }
-
         return mapToRentalDto(rental, getKosName(rental.getKosId()));
     }
 
@@ -166,19 +208,18 @@ public class RentalServiceImpl implements RentalService {
     public RentalDto cancelRental(UUID rentalId, UUID userId, String userRole) {
         Rental rental = rentalRepository.findById(rentalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rental not found with ID: " + rentalId));
-
         boolean isTenant = "TENANT".equals(userRole) && Objects.equals(rental.getTenantUserId(), userId);
 
         if (!isTenant) {
-            throw new ForbiddenException("User not authorized to cancel this rental.");
+            throw new ForbiddenException("User not authorized to cancel this rental through this flow.");
         }
-        if (rental.getStatus() == RentalStatus.COMPLETED || rental.getStatus() == RentalStatus.CANCELLED) {
-            throw new ValidationException("Rental cannot be cancelled in its current state: " + rental.getStatus());
+        if (!(rental.getStatus() == RentalStatus.PENDING_APPROVAL || rental.getStatus() == RentalStatus.APPROVED)) {
+            throw new ValidationException("Rental cannot be cancelled by tenant in its current state: " + rental.getStatus() + ". Contact owner.");
         }
 
         rental.setStatus(RentalStatus.CANCELLED);
         Rental cancelledRental = rentalRepository.save(rental);
-        log.info("Rental {} cancelled by tenant {}", rentalId, userId);
+        log.info("Rental {} cancelled by user {} (role: {})", rentalId, userId, userRole);
 
         sendNotification(
                 cancelledRental.getOwnerUserId(),
@@ -204,10 +245,14 @@ public class RentalServiceImpl implements RentalService {
         if (rental.getStatus() != RentalStatus.PENDING_APPROVAL) {
             throw new ValidationException("Rental can only be approved if status is PENDING_APPROVAL.");
         }
-        KosDetailsDto kosDetails = kosServiceClient.getKosDetails(rental.getKosId());
-        long activeRentals = kosServiceClient.getActiveRentalsCountForKos(rental.getKosId());
-        if (activeRentals >= kosDetails.getTotalRooms()) { // Check vacancy again before approval
-            throw new ValidationException("No rooms available to approve this rental for kos ID: " + rental.getKosId());
+
+        KosDetailsDto kosDetails = fetchKosDetails(rental.getKosId()); // Use helper
+
+        List<RentalStatus> consideredActiveStatuses = Arrays.asList(RentalStatus.APPROVED, RentalStatus.ACTIVE);
+        List<Rental> activeRentalsForThisKos = rentalRepository.findByKosIdAndStatusIn(rental.getKosId(), consideredActiveStatuses);
+
+        if (activeRentalsForThisKos.size() >= kosDetails.getTotalRooms()) {
+            throw new ValidationException("No rooms available to approve this rental for kos ID: " + rental.getKosId() + ". Another rental might have been approved concurrently.");
         }
 
         rental.setStatus(RentalStatus.APPROVED);
@@ -218,34 +263,35 @@ public class RentalServiceImpl implements RentalService {
                 approvedRental.getTenantUserId(),
                 "RENTAL_APPLICATION_APPROVED",
                 "Your Rental Application is Approved!",
-                "Congratulations! Your rental application for kos '" + getKosName(approvedRental.getKosId()) + "' has been approved. Please proceed with payment.",
+                "Congratulations! Your rental application for kos '" + kosDetails.getName() + "' has been approved. Please proceed with payment if applicable.",
                 approvedRental.getId()
         );
 
-        RentalEvent approvedEvent = new RentalEvent(
-                approvedRental.getId().toString(),
-                approvedRental.getTenantUserId().toString(),
-                approvedRental.getKosId().toString(),
-                approvedRental.getOwnerUserId().toString(),
-                kosDetails.getName(),
-                approvedRental.getRentalStartDate(),
-                approvedRental.getRentalDurationMonths(),
-                kosDetails.getPricePerMonth(), // Or a calculated final price
-                RentalStatus.APPROVED.name(), // Explicitly "APPROVED"
-                approvedRental.getSubmittedTenantName(),
-                approvedRental.getSubmittedTenantPhone()
-        );
+        id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent approvedEvent = id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent.builder()
+                .rentalId(approvedRental.getId().toString())
+                .userId(approvedRental.getTenantUserId().toString())
+                .kosId(approvedRental.getKosId().toString())
+                .kosOwnerId(approvedRental.getOwnerUserId().toString())
+                .kosName(kosDetails.getName())
+                .bookingDate(approvedRental.getRentalStartDate())
+                .rentalDurationMonths(approvedRental.getRentalDurationMonths())
+                .price(kosDetails.getMonthlyRentPrice())
+                .status(RentalStatus.APPROVED.name())
+                .tenantName(approvedRental.getSubmittedTenantName())
+                .tenantPhone(approvedRental.getSubmittedTenantPhone())
+                .timestamp(LocalDateTime.now().toString())
+                .build();
         try {
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.TOPIC_EXCHANGE_NAME,
-                    RabbitMQConfig.ROUTING_KEY_RENTAL_APPROVED, // Use a specific key for approved
+                    RabbitMQConfig.ROUTING_KEY_RENTAL_APPROVED,
                     approvedEvent);
             log.info("Published rental.approved event for rentalId {}: {}", approvedRental.getId(), approvedEvent);
         } catch (Exception e) {
             log.error("Failed to publish rental.approved event for rentalId {}: {}", approvedRental.getId(), e.getMessage(), e);
         }
 
-        return mapToRentalDto(approvedRental, getKosName(approvedRental.getKosId()));
+        return mapToRentalDto(approvedRental, kosDetails.getName());
     }
 
     @Override
@@ -272,16 +318,17 @@ public class RentalServiceImpl implements RentalService {
                 "We regret to inform you that your rental application for kos '" + getKosName(rejectedRental.getKosId()) + "' has been rejected.",
                 rejectedRental.getId()
         );
+        triggerVacancyCheck(rejectedRental.getKosId());
         return mapToRentalDto(rejectedRental, getKosName(rejectedRental.getKosId()));
     }
 
     private String getKosName(UUID kosId) {
         try {
-            KosDetailsDto details = kosServiceClient.getKosDetails(kosId);
-            return details != null ? details.getName() : "Unknown Kos";
-        } catch (Exception e) {
-            log.warn("Could not fetch kos name for ID {}: {}", kosId, e.getMessage());
-            return "Kos " + kosId;
+            KosDetailsDto details = fetchKosDetails(kosId);
+            return details.getName();
+        } catch (ResourceNotFoundException | ServiceUnavailableException | ServiceInteractionException e) {
+            log.warn("Could not retrieve Kos name for ID {} due to: {}. Using placeholder.", kosId, e.getMessage());
+            return "Kos (ID: " + kosId.toString().substring(0, 8) + ")";
         }
     }
 
@@ -291,12 +338,12 @@ public class RentalServiceImpl implements RentalService {
             notificationServiceClient.sendNotification(notification);
             log.info("Notification of type {} sent to user {} for rental {}", type, recipientUserId, relatedRentalId);
         } catch (Exception e) {
-            log.error("Failed to send notification type {} for rental {}: {}", type, relatedRentalId, e.getMessage());
+            log.error("Failed to send notification type {} for rental {}: {}", type, relatedRentalId, e.getMessage(), e);
         }
     }
 
     private void triggerVacancyCheck(UUID kosId) {
-        log.info("Vacancy check triggered for kosId: {} due to rental cancellation/completion.", kosId);
+        log.info("Vacancy check potentially triggered for kosId: {} due to rental status change (cancelled/rejected).", kosId);
     }
 
     private RentalDto mapToRentalDto(Rental rental, String kosName) {
@@ -315,5 +362,19 @@ public class RentalServiceImpl implements RentalService {
                 .createdAt(rental.getCreatedAt())
                 .updatedAt(rental.getUpdatedAt())
                 .build();
+    }
+
+    @ResponseStatus(HttpStatus.FAILED_DEPENDENCY)
+    static class ServiceInteractionException extends RuntimeException {
+        public ServiceInteractionException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    static class ServiceUnavailableException extends RuntimeException {
+        public ServiceUnavailableException(String message) {
+            super(message);
+        }
     }
 }

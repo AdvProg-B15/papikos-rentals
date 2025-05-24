@@ -8,6 +8,7 @@ import lombok.*;
 @Getter
 @Setter
 @Builder
+@NoArgsConstructor
 public class RentalEvent implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -22,13 +23,11 @@ public class RentalEvent implements Serializable {
     private String status;
     private String tenantName;
     private String tenantPhone;
-
-
-    public RentalEvent() {}
+    private String timestamp;
 
     public RentalEvent(String rentalId, String userId, String kosId, String kosOwnerId, String kosName,
                        LocalDate bookingDate, Integer rentalDurationMonths, BigDecimal price, String status,
-                       String tenantName, String tenantPhone) {
+                       String tenantName, String tenantPhone, String timestamp) {
         this.rentalId = rentalId;
         this.userId = userId;
         this.kosId = kosId;
@@ -40,5 +39,6 @@ public class RentalEvent implements Serializable {
         this.status = status;
         this.tenantName = tenantName;
         this.tenantPhone = tenantPhone;
+        this.timestamp = timestamp;
     }
 }
