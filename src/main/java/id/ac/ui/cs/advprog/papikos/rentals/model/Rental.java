@@ -66,18 +66,22 @@ public class Rental {
         if (this.id == null) {
             this.id = UUID.randomUUID();
         }
+        if (rentalStartDate == null || rentalDurationMonths == null || rentalDurationMonths <= 0) {
+            this.rentalEndDate = null;
+            return;
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (rentalStartDate != null && rentalDurationMonths > 0) {
-            rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
-        }
+        rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
-        if (rentalStartDate != null && rentalDurationMonths > 0) {
-            rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
+        if (rentalStartDate == null || rentalDurationMonths == null || rentalDurationMonths <= 0) {
+            this.rentalEndDate = null;
+            return;
         }
+        rentalEndDate = rentalStartDate.plusMonths(rentalDurationMonths);
     }
 }
