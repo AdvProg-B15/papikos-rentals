@@ -17,11 +17,11 @@ env:
   # This is the key for service in the central values.yaml file
   # e.g., for '.auth.image.tag', this would be 'auth'
   # e.g., for '.frontend.image.tag', this would be 'frontend'
-  SERVICE_KEY_IN_VALUES_YAML: kos
+  SERVICE_KEY_IN_VALUES_YAML: rental
 
   # This is the image name as it appears in the Artifact Registry (without the tag)
   # e.g., 'papikos-auth', 'papikos-fe'
-  IMAGE_NAME_IN_REGISTRY: papikos-kos
+  IMAGE_NAME_IN_REGISTRY: papikos-rental
   # === END SERVICE-SPECIFIC CONFIGURATION ===
 
   # --- Global Configuration (usually same across services) ---
