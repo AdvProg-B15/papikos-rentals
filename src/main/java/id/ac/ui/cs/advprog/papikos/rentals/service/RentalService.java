@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface RentalService {
+    void tryFetchKosDetail(UUID kosId);
+
     RentalDto submitRentalApplication(UUID tenantUserId, RentalApplicationRequest request);
     List<RentalDto> getTenantRentals(UUID tenantUserId);
     List<RentalDto> getOwnerRentals(UUID ownerUserId, RentalStatus status, UUID propertyIdFilter);

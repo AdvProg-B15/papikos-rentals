@@ -1,10 +1,12 @@
 package id.ac.ui.cs.advprog.papikos.rentals.controller;
 
+import id.ac.ui.cs.advprog.papikos.rentals.client.KosServiceClient;
 import id.ac.ui.cs.advprog.papikos.rentals.dto.*;
 import id.ac.ui.cs.advprog.papikos.rentals.enums.RentalStatus;
 import id.ac.ui.cs.advprog.papikos.rentals.response.ApiResponse;
 import id.ac.ui.cs.advprog.papikos.rentals.service.RentalService;
 import jakarta.validation.Valid;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class RentalController {
 
     private final RentalService rentalService;
+    private final KosServiceClient kosServiceClient;
 
     /**
      * Helper method to extract UUID from Authentication principal name.
@@ -39,6 +42,19 @@ public class RentalController {
             log.error("Error parsing UUID from principal name: {}", authentication.getName(), e);
             throw new IllegalArgumentException("Invalid user identifier format in authentication token.");
         }
+    }
+
+    @GetMapping("/tes/{kosId}")
+    public ResponseEntity<ApiResponse<String>> testEndpoint(@PathVariable String kosId) {
+        log.info("Testing endpoint with kosId: {}", kosId);
+        UUID id = UUID.fromString(kosId);
+        rentalService.tryFetchKosDetail(id);
+        ApiResponse<String> response = ApiResponse.<String>builder()
+                .status(HttpStatus.OK)
+                .message("Test successful")
+                .data("SUCCESS")
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping
