@@ -54,20 +54,10 @@ public class RentalServiceImpl implements RentalService {
     }
 
     // Helper method to fetch and unwrap KosDetailsDto
-    private KosDetailsDto fetchKosDetails(UUID kosId) {
+    KosDetailsDto fetchKosDetails(UUID kosId) {
         KosApiResponseWrapper<KosDetailsDto> responseWrapper;
         try {
             responseWrapper = kosServiceClient.getKosDetailsApiResponse(kosId);
-//            ResponseEntity<String> response = restTemplate.exchange(
-//                    "http://localhost:8081/api/v1/" + kosId,
-//                    HttpMethod.GET,
-//                    new HttpEntity<>(new HttpHeaders() {{
-//                        set("X-Internal-Token", internalTokenSecret);
-//                    }}),
-//                    String.class);
-//
-//            responseWrapper = objectMapper.readValue(response.getBody(),
-//                    objectMapper.getTypeFactory().constructParametricType(KosApiResponseWrapper.class, KosDetailsDto.class));
 
         } catch (FeignException e) {
             log.error("FeignException while fetching Kos details for ID {}: Status {}, Body {}",
@@ -352,7 +342,7 @@ public class RentalServiceImpl implements RentalService {
         return mapToRentalDto(rejectedRental, getKosName(rejectedRental.getKosId()));
     }
 
-    private String getKosName(UUID kosId) {
+    String getKosName(UUID kosId) {
         try {
             KosDetailsDto details = fetchKosDetails(kosId);
             return details.getName();
@@ -362,7 +352,7 @@ public class RentalServiceImpl implements RentalService {
         }
     }
 
-    private void sendNotification(UUID recipientUserId, String type, String title, String message, UUID relatedRentalId) {
+    void sendNotification(UUID recipientUserId, String type, String title, String message, UUID relatedRentalId) {
         try {
             NotificationRequest notification = new NotificationRequest(recipientUserId, type, title, message, relatedRentalId);
             notificationServiceClient.sendNotification(notification);
@@ -372,11 +362,11 @@ public class RentalServiceImpl implements RentalService {
         }
     }
 
-    private void triggerVacancyCheck(UUID kosId) {
+    void triggerVacancyCheck(UUID kosId) {
         log.info("Vacancy check potentially triggered for kosId: {} due to rental status change (cancelled/rejected).", kosId);
     }
 
-    private RentalDto mapToRentalDto(Rental rental, String kosName) {
+    RentalDto mapToRentalDto(Rental rental, String kosName) {
         return RentalDto.builder()
                 .rentalId(rental.getId())
                 .tenantUserId(rental.getTenantUserId())

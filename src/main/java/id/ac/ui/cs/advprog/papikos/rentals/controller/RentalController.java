@@ -31,7 +31,7 @@ public class RentalController {
      * Helper method to extract UUID from Authentication principal name.
      * Throws IllegalArgumentException if parsing fails or principal is missing.
      */
-    private UUID getUserIdFromAuthentication(Authentication authentication) {
+    UUID getUserIdFromAuthentication(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             log.warn("Authentication principal is required but missing.");
             throw new IllegalStateException("Authentication principal is required but missing.");
