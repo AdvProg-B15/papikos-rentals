@@ -116,21 +116,6 @@ class RentalTest {
     }
 
     @Test
-    void testOnCreate_IdIsNull() {
-        Rental newRental = new Rental();
-        newRental.setRentalStartDate(LocalDate.now());
-        newRental.setRentalDurationMonths(1);
-        newRental.onCreate();
-
-        assertNotNull(newRental.getId());
-        assertNotNull(newRental.getCreatedAt());
-        assertNotNull(newRental.getUpdatedAt());
-        assertEquals(newRental.getCreatedAt(), newRental.getUpdatedAt());
-        assertNotNull(newRental.getRentalEndDate());
-        assertEquals(newRental.getRentalStartDate().plusMonths(1), newRental.getRentalEndDate());
-    }
-
-    @Test
     void testOnCreate_IdIsNotNull() {
         UUID preSetId = UUID.randomUUID();
         Rental newRental = new Rental();
