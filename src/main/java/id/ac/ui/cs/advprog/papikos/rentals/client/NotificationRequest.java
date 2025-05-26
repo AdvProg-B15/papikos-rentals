@@ -1,22 +1,20 @@
 package id.ac.ui.cs.advprog.papikos.rentals.client;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
 @Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class NotificationRequest {
-    private UUID recipientUserId;
-    private String type; // e.g., RENTAL_APPLICATION_SUBMITTED
+    private UUID relatedRentalId;
+    private UUID recipientId;
+    private UUID relatedPropertyId; // Ini adalah Kos ID
     private String title;
     private String message;
-    private UUID relatedRentalId;
-
-    public NotificationRequest(UUID recipientUserId, String type, String title, String message, UUID relatedRentalId) {
-        this.recipientUserId = recipientUserId;
-        this.type = type;
-        this.title = title;
-        this.message = message;
-        this.relatedRentalId = relatedRentalId;
-    }
 }
