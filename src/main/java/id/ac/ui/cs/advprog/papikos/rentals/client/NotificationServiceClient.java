@@ -5,10 +5,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "notification-service", url = "${notification.service.url:http://localhost:8083/api/v1/notifications}")
+@FeignClient(name = "notification-service", url = "${notification.service.url:http://localhost:8083}")
 public interface NotificationServiceClient {
 
-    @PostMapping("/internal/send")
+    @PostMapping("/api/v1/notifications/internal/send")
     ResponseEntity<Void> sendNotification(@RequestBody NotificationRequest notificationRequest);
 
     /*
