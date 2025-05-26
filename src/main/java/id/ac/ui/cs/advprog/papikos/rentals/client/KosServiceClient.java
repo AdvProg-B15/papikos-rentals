@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import java.util.UUID;
 
-@FeignClient(name = "kos-service", url = "${kos.service.url:http://localhost:8081}")
+@FeignClient(name = "kos-service", url = "https://kos.papikos.shop")
 public interface KosServiceClient {
 
     @GetMapping("/api/v1/{kosId}")
