@@ -35,6 +35,9 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     @Value("${auth.service.url}")
     String authVerifyUrl;
 
+    @Value("${internal.admin.id}")
+    String internalAdminId;
+
     @Value("${internal.token.secret}")
     String internalTokenSecret;
 
@@ -61,7 +64,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 logger.info("Valid internal token provided for request URI: {}", request.getRequestURI());
                 // Set a dummy authentication for internal requests
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        "6977584e-fc36-4a4d-96c2-2e7db2109829", // Principal
+                        internalAdminId,
                         null,               // Credentials
                         Collections.singletonList(new SimpleGrantedAuthority("INTERNAL")) // Authorities
                 );

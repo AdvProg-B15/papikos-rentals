@@ -46,6 +46,9 @@ public class RentalServiceImpl implements RentalService {
     @Value("${internal.token.secret}")
     private String internalTokenSecret;
 
+    @Value("${internal.admin.id}")
+    private String internalAdminId;
+
     public void tryFetchKosDetail(UUID kosId) {
         try {
             KosDetailsDto kos=  fetchKosDetails(kosId);
@@ -199,7 +202,7 @@ public class RentalServiceImpl implements RentalService {
     public RentalDto getRentalById(UUID rentalId, UUID userId) {
         Rental rental = rentalRepository.findById(rentalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rental not found with ID: " + rentalId));
-        if (!Objects.equals(rental.getTenantUserId(), userId) && !Objects.equals(rental.getOwnerUserId(), userId)) {
+        if (!Objects.equals(userId.toString(), internalAdminId) && !Objects.equals(rental.getTenantUserId(), userId) && !Objects.equals(rental.getOwnerUserId(), userId)) {
             throw new ForbiddenException("User not authorized to view this rental.");
         }
         return mapToRentalDto(rental, getKosName(rental.getKosId()));
