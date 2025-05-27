@@ -43,6 +43,9 @@ public class RentalServiceImpl implements RentalService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
+    @Value("${internal.token.secret}")
+    private String internalTokenSecret;
+
     public void tryFetchKosDetail(UUID kosId) {
         try {
             KosDetailsDto kos=  fetchKosDetails(kosId);
@@ -61,7 +64,7 @@ public class RentalServiceImpl implements RentalService {
                     "https://kos.papikos.shop/api/v1/" + kosId,
                     HttpMethod.GET,
                     new HttpEntity<>(new HttpHeaders() {{
-                        set("X-Internal-Token", "your-very-secure-and-long-internal-token-secret");
+                        set("X-Internal-Token", internalTokenSecret);
                     }}),
                     String.class);
 
