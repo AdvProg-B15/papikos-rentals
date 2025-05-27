@@ -2,7 +2,6 @@ package id.ac.ui.cs.advprog.papikos.rentals.config;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,12 +14,9 @@ public class GlobalFeignConfig {
 
     @Bean
     public RequestInterceptor propertyBasedRequestInterceptor() {
-        return new RequestInterceptor() {
-            @Override
-            public void apply(RequestTemplate template) {
-                if (internalTokenSecret != null && !internalTokenSecret.isEmpty()) {
-                    template.header("X-Internal-Token", internalTokenSecret);
-                }
+        return template -> {
+            if (internalTokenSecret != null && !internalTokenSecret.isEmpty()) {
+                template.header("X-Internal-Token", internalTokenSecret);
             }
         };
     }

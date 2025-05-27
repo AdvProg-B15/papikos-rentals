@@ -57,15 +57,19 @@ public class RentalServiceImpl implements RentalService {
     KosDetailsDto fetchKosDetails(UUID kosId) {
         KosApiResponseWrapper<KosDetailsDto> responseWrapper;
         try {
-            responseWrapper = kosServiceClient.getKosDetailsApiResponse(kosId);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    "https://kos.papikos.shop/api/v1/" + kosId,
+                    HttpMethod.GET,
+                    new HttpEntity<>(new HttpHeaders() {{
+                        set("X-Internal-Token", "your-very-secure-and-long-internal-token-secret");
+                    }}),
+                    String.class);
 
-        } catch (FeignException e) {
-            log.error("FeignException while fetching Kos details for ID {}: Status {}, Body {}",
-                    kosId, e.status(), e.contentUTF8(), e);
-            if (e.status() == HttpStatus.NOT_FOUND.value()) {
-                throw new ResourceNotFoundException("Kos not found with ID: " + kosId + " (via Kos Service).");
-            }
-            throw new ServiceUnavailableException("Error fetching Kos details: Kos service unavailable or unexpected error. " + e.getMessage());
+            responseWrapper = objectMapper.readValue(response.getBody(),
+                    objectMapper.getTypeFactory().constructParametricType(KosApiResponseWrapper.class, KosDetailsDto.class));
+
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
 
         if (responseWrapper == null) {

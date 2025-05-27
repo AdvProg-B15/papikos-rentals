@@ -122,7 +122,7 @@ public class RentalController {
     }
 
     @PatchMapping("/{rentalId}")
-    @PreAuthorize("hasAuthority('TENANT')") // Only the tenant who submitted can edit
+    @PreAuthorize("hasAnyAuthority('TENANT', 'INTERNAL')") // Only the tenant who submitted can edit
     public ResponseEntity<ApiResponse<RentalDto>> editRentalSubmission(
             @PathVariable UUID rentalId,
             Authentication authentication,
