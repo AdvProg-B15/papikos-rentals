@@ -127,10 +127,10 @@ public class RentalServiceImpl implements RentalService {
 
         sendNotification(
                 kosDetails.getOwnerUserId(),
-                "RENTAL_APPLICATION_RECEIVED",
                 "New Rental Application for " + kosDetails.getName(),
                 request.getSubmittedTenantName() + " has applied to rent your kos '" + kosDetails.getName() + "'.",
-                savedRental.getId()
+                savedRental.getId(),
+                savedRental.getKosId()
         );
 
         RentalEvent event = RentalEvent.builder()
@@ -247,10 +247,10 @@ public class RentalServiceImpl implements RentalService {
 
         sendNotification(
                 cancelledRental.getOwnerUserId(),
-                "RENTAL_CANCELLED_BY_TENANT",
                 "Rental Cancelled for " + getKosName(cancelledRental.getKosId()),
                 "Rental application/agreement for kos '" + getKosName(cancelledRental.getKosId()) + "' (ID: " + cancelledRental.getId() + ") has been cancelled by the tenant.",
-                cancelledRental.getId()
+                cancelledRental.getId(),
+                cancelledRental.getKosId()
         );
         triggerVacancyCheck(cancelledRental.getKosId());
         return mapToRentalDto(cancelledRental, getKosName(cancelledRental.getKosId()));
@@ -285,10 +285,10 @@ public class RentalServiceImpl implements RentalService {
 
         sendNotification(
                 approvedRental.getTenantUserId(),
-                "RENTAL_APPLICATION_APPROVED",
                 "Your Rental Application is Approved!",
-                "Congratulations! Your rental application for kos '" + kosDetails.getName() + "' has been approved. Please proceed with payment if applicable.",
-                approvedRental.getId()
+                "Congratulations! Your rental application for kos '" + getKosName(approvedRental.getKosId()) + "' has been approved. Please proceed with payment if applicable.",
+                approvedRental.getId(),
+                approvedRental.getKosId()
         );
 
         id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent approvedEvent = id.ac.ui.cs.advprog.papikos.rentals.dto.RentalEvent.builder()
@@ -337,10 +337,10 @@ public class RentalServiceImpl implements RentalService {
 
         sendNotification(
                 rejectedRental.getTenantUserId(),
-                "RENTAL_APPLICATION_REJECTED",
                 "Your Rental Application Status",
                 "We regret to inform you that your rental application for kos '" + getKosName(rejectedRental.getKosId()) + "' has been rejected.",
-                rejectedRental.getId()
+                rejectedRental.getId(),
+                rejectedRental.getKosId()
         );
         triggerVacancyCheck(rejectedRental.getKosId());
         return mapToRentalDto(rejectedRental, getKosName(rejectedRental.getKosId()));
@@ -356,13 +356,31 @@ public class RentalServiceImpl implements RentalService {
         }
     }
 
-    void sendNotification(UUID recipientUserId, String type, String title, String message, UUID relatedRentalId) {
+    void sendNotification(UUID recipientUserId, String title, String message, UUID relatedRentalId, UUID relatedKosId) {
         try {
-            NotificationRequest notification = new NotificationRequest(recipientUserId, type, title, message, relatedRentalId);
-            notificationServiceClient.sendNotification(notification);
-            log.info("Notification of type {} sent to user {} for rental {}", type, recipientUserId, relatedRentalId);
+            NotificationRequest notificationPayload = new NotificationRequest(
+                    relatedRentalId,
+                    recipientUserId,
+                    relatedKosId,
+                    title,
+                    message
+            );
+            ResponseEntity<Void> response = notificationServiceClient.sendNotification(notificationPayload);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Rental update notification sent successfully for rental {}, recipient {}", relatedRentalId, recipientUserId);
+            } else {
+                log.warn("Failed to send rental update notification for rental {}, recipient {}. Status: {}",
+                        relatedRentalId, recipientUserId, response.getStatusCode());
+            }
+        } catch (FeignException e) {
+            log.error("FeignException while sending rental update notification for rental {} to {}: Status {}, Body {}. Error: {}",
+                    relatedRentalId, recipientUserId, e.status(), e.contentUTF8(), e.getMessage(), e);
+            throw e; // Melempar kembali FeignException (unchecked) akan menyebabkan rollback jika tidak ditangani lebih lanjut.
         } catch (Exception e) {
-            log.error("Failed to send notification type {} for rental {}: {}", type, relatedRentalId, e.getMessage(), e);
+            log.error("Generic error sending rental update notification for rental {} to {}: {}",
+                    relatedRentalId, recipientUserId, e.getMessage(), e);
+            throw new ServiceInteractionException("Failed to send notification due to an unexpected error."); // Bungkus sebagai runtime
         }
     }
 

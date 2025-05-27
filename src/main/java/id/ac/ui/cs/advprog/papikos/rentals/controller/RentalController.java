@@ -106,7 +106,7 @@ public class RentalController {
     }
 
     @GetMapping("/{rentalId}")
-    @PreAuthorize("hasAnyAuthority('TENANT', 'OWNER')")
+    @PreAuthorize("hasAnyAuthority('TENANT', 'OWNER', 'INTERNAL')")
     public ResponseEntity<ApiResponse<RentalDto>> getRentalById(
             @PathVariable UUID rentalId,
             Authentication authentication) {

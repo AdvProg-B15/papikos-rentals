@@ -7,19 +7,52 @@ import static org.junit.jupiter.api.Assertions.*;
 class NotificationRequestTest {
 
     @Test
-    void testNotificationRequest_ConstructorAndGetters() {
-        UUID recipientUserId = UUID.randomUUID();
-        String type = "TEST_NOTIFICATION";
+    void testNotificationRequestConstructorAndGetters() {
+        UUID rentalId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        UUID propertyId = UUID.randomUUID();
         String title = "Test Title";
         String message = "Test Message";
-        UUID relatedRentalId = UUID.randomUUID();
 
-        NotificationRequest request = new NotificationRequest(recipientUserId, type, title, message, relatedRentalId);
+        NotificationRequest request = new NotificationRequest(rentalId, recipientId, propertyId, title, message);
 
-        assertEquals(recipientUserId, request.getRecipientUserId());
-        assertEquals(type, request.getType());
+        assertEquals(rentalId, request.getRelatedRentalId());
+        assertEquals(recipientId, request.getRecipientId());
+        assertEquals(propertyId, request.getRelatedPropertyId());
         assertEquals(title, request.getTitle());
         assertEquals(message, request.getMessage());
-        assertEquals(relatedRentalId, request.getRelatedRentalId());
+    }
+
+    @Test
+    void testNotificationRequestSetters() {
+        NotificationRequest request = new NotificationRequest();
+
+        UUID rentalId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        UUID propertyId = UUID.randomUUID();
+        String title = "New Title";
+        String message = "New Message";
+
+        request.setRelatedRentalId(rentalId);
+        request.setRecipientId(recipientId);
+        request.setRelatedPropertyId(propertyId);
+        request.setTitle(title);
+        request.setMessage(message);
+
+        assertEquals(rentalId, request.getRelatedRentalId());
+        assertEquals(recipientId, request.getRecipientId());
+        assertEquals(propertyId, request.getRelatedPropertyId());
+        assertEquals(title, request.getTitle());
+        assertEquals(message, request.getMessage());
+    }
+
+    @Test
+    void testNotificationRequestDefaultConstructor() {
+        NotificationRequest request = new NotificationRequest();
+        assertNull(request.getRelatedRentalId());
+        assertNull(request.getRecipientId());
+        assertNull(request.getRelatedPropertyId());
+        assertNull(request.getTitle());
+        assertNull(request.getMessage());
     }
 }

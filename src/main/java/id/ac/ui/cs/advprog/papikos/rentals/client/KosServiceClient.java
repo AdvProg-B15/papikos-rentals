@@ -9,6 +9,6 @@ import java.util.UUID;
 @FeignClient(name = "kos-service", url = "${kos.service.url}")
 public interface KosServiceClient {
 
-    @GetMapping("/{kosId}")
+    @GetMapping("/api/v1/{kosId}")
     KosApiResponseWrapper<KosDetailsDto> getKosDetailsApiResponse(@PathVariable("kosId") UUID kosId);
 }

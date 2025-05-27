@@ -10,6 +10,8 @@ WORKDIR /app
 COPY build.gradle.kts settings.gradle.kts gradlew ./
 COPY gradle ./gradle
 
+RUN chmod +x ./gradlew
+
 # Download dependencies. This layer is cached if build files don't change.
 # Run a task that resolves dependencies. `dependencies` task or `build` with `-x` works.
 # Use `--build-cache` for Gradle's build cache. `|| true` prevents failure if task doesn't exist.
