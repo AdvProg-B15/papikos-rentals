@@ -61,7 +61,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 logger.info("Valid internal token provided for request URI: {}", request.getRequestURI());
                 // Set a dummy authentication for internal requests
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        "internal-service", // Principal
+                        "6977584e-fc36-4a4d-96c2-2e7db2109829", // Principal
                         null,               // Credentials
                         Collections.singletonList(new SimpleGrantedAuthority("INTERNAL")) // Authorities
                 );
